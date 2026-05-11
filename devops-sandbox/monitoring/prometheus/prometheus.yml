@@ -1,0 +1,47 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus scrapes itself for self-monitoring.
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Auto-discovers every container labeled sandbox.role=app and scrapes
+  # its /metrics endpoint on port 5000. Filtered to the platform network
+  # because env containers are also attached to their own private network
+  # which Prometheus cannot reach.
+  - job_name: sandbox-envs
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        port: 5000
+        filters:
+          - name: label
+            values: ['sandbox.role=app']
+    relabel_configs:
+      # Replace the IP-based target with `container_name:5000`. Docker SD
+      # only returns the first-attached network's IP (which is the env's
+      # private network — unreachable from Prometheus). Scraping by name
+      # forces resolution via Docker DNS on the shared platform network.
+      - source_labels: [__meta_docker_container_name]
+        regex: '/?(.+)'
+        target_label: __address__
+        replacement: '${1}:5000'
+      - source_labels: [__meta_docker_container_name]
+        regex: '/?(.+)'
+        target_label: container
+        replacement: '${1}'
+      - source_labels: [__meta_docker_container_label_sandbox_env]
+        target_label: env_id
+      - source_labels: [__meta_docker_container_label_sandbox_role]
+        target_label: role
+
+  # Control API runs on the host. host.docker.internal resolves via the
+  # extra_hosts: host-gateway entry in docker-compose.yml.
+  - job_name: control-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['host.docker.internal:5000']
+        labels:
+          service: control-api

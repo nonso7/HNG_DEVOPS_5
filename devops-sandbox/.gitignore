@@ -1,0 +1,21 @@
+# Secrets — NEVER commit
+.env
+
+# Runtime state — regenerated on each run
+envs/*.json
+logs/*
+!logs/.gitkeep
+
+# Auto-generated nginx configs (per-env)
+nginx/conf.d/*.conf
+
+# Keep otherwise-empty folders tracked
+!**/.gitkeep
+
+# Python / editor noise
+__pycache__/
+*.pyc
+.venv/
+venv/
+.vscode/
+.idea/
